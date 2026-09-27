@@ -32,7 +32,11 @@ The project is designed to test whether multimodality improves representation qu
 
 ## Data
 
-The repository does not include the observational dataset or the large simulated HDF5 file. The real-data loader expects a directory with this structure:
+## Get data
+**Codebases are structured as modular, data-agnostic execution engines with separate data ingestion paths for high-performance clusters.**
+
+Unpack the dataset containing supernovae spectra, light curves and host galaxy images...
+ The real-data loader expects a directory with this structure:
 
 ```text
 ZTFBTS/
