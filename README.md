@@ -2,10 +2,6 @@
 
 Machine learning experiments for learning representations of astronomical transients from heterogeneous observations.
 
-<p align="center">
-  <img src="imgs/logo_cropped.png" alt="Astronomical transient multimodal learning" width="420">
-</p>
-
 ## Results at a glance
 
 The repository includes five-class purity and completeness figures for representative modality combinations. These plots show how well the learned representation separates transient classes as the retrieval threshold changes. The labels in each filename identify the experiment family, including bimodal or trimodal inputs and the spectral/light-curve encoder settings.
