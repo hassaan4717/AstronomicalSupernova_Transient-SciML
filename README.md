@@ -2,6 +2,23 @@
 
 Machine learning experiments for learning representations of astronomical transients from heterogeneous observations.
 
+<p align="center">
+  <img src="imgs/logo_cropped.png" alt="Astronomical transient multimodal learning" width="420">
+</p>
+
+## Results at a glance
+
+The repository includes five-class purity and completeness figures for representative modality combinations. These plots show how well the learned representation separates transient classes as the retrieval threshold changes. The labels in each filename identify the experiment family, including bimodal or trimodal inputs and the spectral/light-curve encoder settings.
+
+| Purity | Completeness |
+|:------:|:------------:|
+| <img src="imgs/Purity_5Class_bimodal_specLCNN10_maxlen200.png" alt="Five-class purity for a bimodal spectral and light-curve model" width="420"> | <img src="imgs/Completeness_5Class_bimodal_specLCNN10_maxlen200.png" alt="Five-class completeness for a bimodal spectral and light-curve model" width="420"> |
+| Bimodal spectral + light-curve representation | Bimodal spectral + light-curve representation |
+| <img src="imgs/Purity_5Class_trimodal_specLCNN10_maxlen200.png" alt="Five-class purity for a trimodal model" width="420"> | <img src="imgs/Completeness_5Class_trimodal_specLCNN10_maxlen200.png" alt="Five-class completeness for a trimodal model" width="420"> |
+| Trimodal representation | Trimodal representation |
+
+These are repository artifacts for illustrating the evaluation outputs, not a claim that one configuration is universally best. The training scripts also generate `loss_history.png` and, for contrastive runs with multiple modalities, `ROC_curves.png` inside each run directory under `analysis/` or the configured model-output directory.
+
 ## Research question
 
 Can a model learn a more useful representation of a transient by jointly aligning the information in its light curve, spectrum, host-galaxy image, and available metadata than by using any single observation type alone?
@@ -141,6 +158,16 @@ python evaluate_models.py
 ```
 
 The evaluation code supports redshift regression, three- and five-class classification, linear and k-nearest-neighbor probes on learned embeddings, confusion matrices, prediction plots, and aggregate comparison plots. It also checks that the filenames loaded for evaluation belong to the splits saved during training.
+
+### Generated diagnostics
+
+Training runs produce visual diagnostics alongside their checkpoints:
+
+- `loss_history.png` compares training and validation loss across epochs.
+- `ROC_curves.png` compares cross-modal retrieval by measuring whether an observation retrieves its paired observation in embedding space.
+- Evaluation runs can additionally create normalized confusion matrices, prediction-versus-truth plots, and radar plots through the helpers in `src/utils.py`.
+
+For a new experiment, inspect these files together with the saved `config.yaml`, `train_filenames.txt`, and `val_filenames.txt`. A falling training loss alone is not evidence that the representation generalizes; validation curves and object-level held-out metrics are the relevant checks.
 
 ## Repository layout
 
