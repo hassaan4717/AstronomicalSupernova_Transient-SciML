@@ -1,139 +1,193 @@
-# Multimodality with supernovae 
-<p align="center">
-    <img src="https://github.com/ThomasHelfer/multimodal-supernovae/blob/main/imgs/logo_cropped.png" alt="no alignment" width="34%" height="auto"/>
-</p>
+# AstronomicalSupernova_Transient-SciML
 
-<div align="center">
+Machine learning experiments for learning representations of astronomical transients from heterogeneous observations.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-red.svg)](https://opensource.org/licenses/MIT)
-![Unittest](https://github.com/ThomasHelfer/multimodal-supernovae/actions/workflows/actions.yml/badge.svg)
-[![arXiv: 2408.16829](https://img.shields.io/badge/arXiv-2408.16829-b31b1b.svg)](https://arxiv.org/pdf/2408.16829)
-[![Hugging Face Dataset: multimodal_supernovae](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Dataset%3A%20multimodal_supernovae-FFD21E)](https://huggingface.co/datasets/thelfer/multimodal_supernovae)
+## Research question
 
-</div>
+Can a model learn a more useful representation of a transient by jointly aligning the information in its light curve, spectrum, host-galaxy image, and available metadata than by using any single observation type alone?
 
-## Overview
-This codebase is dedicated to exploring different self-supervised pretraining methods. We integrate multimodal data from supernovae light curves with images of their host galaxies. Our goal is to leverage diverse data types to improve the prediction and understanding of astronomical phenomena. 
+This repository addresses that question with a controlled set of experiments:
 
-An overview over the the CLIP method and loss [link](https://lilianweng.github.io/posts/2021-05-31-contrastive/) 
+- **Multimodal contrastive learning:** modality-specific encoders map paired observations of the same transient into a shared embedding space. The training objective rewards matching observations and separates unrelated observations.
+- **Masked light-curve pretraining:** a transformer reconstructs masked sections of a light curve, providing an optional initialization for downstream models.
+- **Downstream prediction:** the learned representations are used for redshift regression and three- or five-class transient classification.
+- **Ablations and comparisons:** configurations can use `lightcurve`, `spectral`, `host_galaxy`, and `meta` in different combinations, with optional simulated pretraining, noisy augmentation, frozen backbones, and stratified cross-validation.
 
-All data used in this work is available here: [link](https://huggingface.co/datasets/thelfer/multimodal_supernovae)
+### What is the answer?
 
-Paper associated with code [link](https://arxiv.org/pdf/2408.16829)
+The project is designed to test whether multimodality improves representation quality and downstream prediction. Its scientific answer is empirical: compare the validation and held-out metrics of the same architecture and split across modality combinations and training strategies. The code does not assume that adding a modality always helps; missing, noisy, or weakly informative observations can make a unimodal model competitive. Run `evaluate_models.py` on the trained checkpoints to produce the comparison rather than treating the research question as settled by the model design alone.
 
-Our transformer-based model [Maven](models/clip_noiselesssimpretrain_clipreal) is pretrained on simulated data and finetuned on observations. We compare it with [Maven-lite](models/clip_real) which is directly trained on observations, and a transformer-based supervised [classifcation model](models/lc_3way_f1) and [regression model](models/lc_reg). 
+## Data
+
+The repository does not include the observational dataset or the large simulated HDF5 file. The real-data loader expects a directory with this structure:
+
+```text
+ZTFBTS/
+├── ZTFBTS_TransientTable.csv
+├── hostImgs/
+│   └── <ZTFID>.host.png
+└── light-curves/
+    └── <ZTFID>.csv
+
+ZTFBTS_spectra/
+└── <ZTFID>.csv
+```
+
+Each transient is joined by its `ZTFID`. Light-curve CSV files must contain `time`, `mag`, `magerr`, and `band` columns. Spectral CSV files contain either `freq,spec` or `freq,spec,specerr`. The transient table supplies redshift, class, and extinction information.
+
+The included data note describes the ZTF Bright Transient Survey selection. The current loader applies Milky Way extinction corrections to light curves, pads or truncates sequences, masks padded values, normalizes time per band, scales host images to `[0, 1]`, and can rescale spectra to avoid floating-point issues.
+
+For simulated pretraining, place the HDF5 file configured by `pretrain_config/maven_pretrain_config.yaml` at:
+
+```text
+data/sim_data/ZTF_Pretrain_5Class.hdf5
+```
+
+The HDF5 file is expected to contain the simulated photometry and spectral groups used by `SimulationDataset`.
 
 ## Installation
 
-### Prerequisites
-Before installing, ensure you have the following prerequisites:
-- Python 3.8 or higher
-- pip package manager
+```bash
+git clone https://github.com/hassaan4717/AstronomicalSupernova_Transient-SciML.git
+cd AstronomicalSupernova_Transient-SciML
 
-### Steps
-1. #### Clone the Repository
-   Clone the repository to your local machine and navigate into the directory:
-   ```bash
-   git clone git@github.com:ThomasHelfer/Multimodal-hackathon-2024.git
-   cd Multimodal-hackathon-2024.git
-   ```
+python -m venv .venv
+# Windows PowerShell
+.\.venv\Scripts\Activate.ps1
+# Linux or macOS
+# source .venv/bin/activate
 
-2. #### Get data
-   Unpack the dataset containing supernovae spectra, light curves and host galaxy images:
-   ```bash
-   git clone https://huggingface.co/datasets/thelfer/multimodal_supernovae
-   mv multimodal_supernovae/ZTFBTS* .
-   mkdir sim_data && cd sim_data 
-   wget https://huggingface.co/datasets/thelfer/multimodal_supernovae/resolve/main/sim_data/ZTF_Pretrain_5Class.hdf5
-   ```
-  
-4. #### Install Required Python Packages
-   We recommend to set up an virtual enviorment
-   ```bash
-   virtualenv dev
-   source dev/bin/activate
-   ```
-   Install all dependencies listed in the requirements.txt file:
-   ```bash
-   pip install -r requirements.txt 
-   ```
-5. #### Pretrain on simulated data
-   Run the pretrain script
-   ```bash
-   python pretraining_clip_wandb.py pretrain_config/maven_pretrain_config.yaml 
-   ```
-6. #### Finetune maven on real data
-   Clip finetuning the pretrained model 
-   ```bash
-   python finetune_clip.py configs/maven_finetune.yaml
-   ```
-   the config file uses the path of our pre-trained model, to apply this to your model, please change the path 
-7. #### Train maven-lite
-   Run the script
-   ```bash
-   python script_wandb.py configs/maven-lite.yaml
-   ```
-### Setting Up a Hyperparameter Scan with Weights & Biases
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
 
-1. #### Create a Weights & Biases Account
-   Sign up for an account at [Weights & Biases]((https://wandb.ai)) if you haven't already.
-2. #### Configure Your Project
-   Edit the configuration file to specify your project name. Ensure the name matches the project you create on [wandb.ai](https://wandb.ai). You can define sweep parameters within the [config file](https://github.com/ThomasHelfer/Multimodal-hackathon-2024/blob/main/configs/config_grid.yaml) .
-3. #### Choose important parameters
-   In the config file you can choose
-   ```yaml
-   extra_args
-     regression: True
-   ```
-   if true, script_wandb.py performs a regression for redshift.
-   Similarly for
-   ```yaml
-   extra_args
-     classification: True
-   ```
-   if true, script_wandb.py performs a classification.
-   if neither are true, it will perform a normal clip pretraining.
-   Lastly, for
-   ```yaml
-   extra_args
-     pretrain_lc_path: 'path_to_checkpoint/checkpoint.ckpt'
-     freeze_backbone_lc: True
-   ```
-   preloads a pretrained model in script_wandb.py or allows to restart a run from a checkpoint for retraining_wandb.py
-5. #### Run the Sweep Script
-   Start the hyperparameter sweep with the following command:
-   ```bash
-   python script_wandb.py configs/config_grid.yaml 
-   ```
-   Resume a sweep with the following command:
-   ```bash
-   python script_wandb.py [sweep_id]
-   ```
-6. #### API Key Configuration
-   The first execution will prompt you for your Weights & Biases API key, which can be found [here]([https://wandb.ai](https://wandb.ai/authorize)https://wandb.ai/authorize). 
- Alternatively, you can set your API key as an environment variable, especially if running on a compute node:
-      ```bash
-   export WANDB_API_KEY=...
-   ```
-7. #### View Results
-   Monitor and analyze your experiment results on your Weights & Biases project page. [wandb.ai](https://wandb.ai)
+Python 3.8 or newer is required. A CUDA-enabled PyTorch installation is recommended for practical training, but the scripts fall back to CPU execution when CUDA is unavailable.
 
-### Running a k-fold cross-validation
-   We can run a k-fold cross validation by defining the variable 
-   ```yaml
-    extra_args:
-      kfolds: 5 # for strat Crossvaildation
-   ```
-   as this can take serially very long, one can choose to split your runs for different submission by just choosing certain folds for each submission    
-   ```yaml
-      foldnumber:
-        values: [1,2,3]
-   ```
+## Weights & Biases
 
-### Calculate performance metrics from models
-   To calculate the performance of checkpoint files of models, change the folderpath in the file evaluate_models.py 
-   and corresponding name. Then simply calculate metrics by running 
-   ```bash
-   python evaluate_models.py
-   ```
+Training is managed through Weights & Biases sweeps. Create a W&B account, then authenticate once in the environment where training will run:
 
+```bash
+wandb login
+```
+
+The configuration files contain the W&B `entity` and `project`. Change them to match the account and project that should receive the runs. The scripts save sweep configurations, checkpoints, split filenames, and diagnostic plots below `analysis/`.
+
+## Training workflows
+
+All commands below are run from the repository root.
+
+### 1. Train a model on real observations
+
+The default real-data workflow is configured in `configs/maven-lite.yaml`:
+
+```bash
+python script_wandb.py configs/maven-lite.yaml
+```
+
+`script_wandb.py` loads the configured modality combination, applies noise augmentation during training, creates train/validation or stratified k-fold splits, trains the multimodal model, and writes checkpoints and metrics. Set these fields under `extra_args` to change the task:
+
+```yaml
+extra_args:
+  combinations: [lightcurve, spectral]
+  regression: false
+  classification: false
+```
+
+Use `regression: true` for redshift prediction. Use `classification: true` and set `n_classes` to `3` or `5` for transient-type classification. Keep both false for contrastive representation learning.
+
+Supported modality names are `lightcurve`, `spectral`, `host_galaxy`, and `meta`. The `meta` encoder uses class and redshift values as auxiliary inputs and should be treated carefully in any scientific comparison because those values are also prediction targets or closely related to them.
+
+### 2. Pretrain on simulated transients
+
+After placing the simulated HDF5 file under `data/sim_data/`, run:
+
+```bash
+python pretraining_clip_wandb.py pretrain_config/maven_pretrain_config.yaml
+```
+
+This trains a contrastive model on simulated light curves and spectra. The configuration controls the sequence lengths, noise setting, encoder sizes, optimization parameters, and W&B sweep.
+
+### 3. Fine-tune a pretrained model
+
+Set `extra_args.pretrain_path` in `configs/maven_finetune.yaml` to a checkpoint produced by pretraining, then run:
+
+```bash
+python finetune_clip.py configs/maven_finetune.yaml
+```
+
+Use `extra_args.freeze_backbone: true` to keep the pretrained encoders fixed while training the downstream head. Set it to `false` to fine-tune the full model.
+
+### 4. Resume a sweep
+
+When a sweep has already been scheduled, pass its saved sweep directory or identifier as accepted by the script:
+
+```bash
+python script_wandb.py <sweep-directory-or-id>
+```
+
+The scripts store the generated sweep configuration under `analysis/<sweep-id>/`.
+
+## Evaluation
+
+`evaluate_models.py` loads the checkpoint directories listed near the top of the file, reconstructs each model, reloads the train and validation transient splits, and computes comparison metrics. Before running it:
+
+1. Make sure the real-data directories are available in one of the paths searched by the script, or update its `data_dirs` lists.
+2. Add or remove checkpoint directories in `directories` and matching display names in `names`.
+3. Run:
+
+```bash
+python evaluate_models.py
+```
+
+The evaluation code supports redshift regression, three- and five-class classification, linear and k-nearest-neighbor probes on learned embeddings, confusion matrices, prediction plots, and aggregate comparison plots. It also checks that the filenames loaded for evaluation belong to the splits saved during training.
+
+## Repository layout
+
+```text
+AstronomicalSupernova_Transient-SciML/
+├── configs/                   W&B configurations for real-data experiments
+├── data/                     Data notes and local data mount point
+├── evaluation_metrics/       Evaluation-related outputs and resources
+├── models/                   Saved or tracked model experiment directories
+├── pretrain_config/          Configuration for simulated pretraining
+├── src/
+│   ├── dataloader.py         Data loading, alignment, padding, masking, and augmentation
+│   ├── loss.py               Contrastive losses
+│   ├── models_multimodal.py  Multimodal encoders and prediction heads
+│   ├── models_pretraining.py Masked light-curve pretraining
+│   ├── transformer_utils.py  Time-aware transformer components
+│   ├── utils.py              Metrics, probes, plots, and reproducibility helpers
+│   └── wandb_utils.py        Sweep creation and continuation
+├── evaluate_models.py        Checkpoint evaluation and comparison
+├── finetune_clip.py          Pretrained-model fine-tuning
+├── pretraining_clip_wandb.py Simulated contrastive pretraining
+├── script_wandb.py           Real-data training and downstream tasks
+└── tests/                    Data-loader tests
+```
+
+## Testing
+
+The data-loader test requires the real dataset directories because it verifies modality alignment and time normalization:
+
+```bash
+pytest tests/test_dataloader.py
+```
+
+Without the dataset, the test cannot load `ZTFBTS/` and `ZTFBTS_spectra/`. The test suite does not download data automatically.
+
+## Reproducibility and scientific comparisons
+
+- Set the same `seed`, modality combination, split strategy, sequence limits, and preprocessing factors when comparing models.
+- Use the saved `train_filenames.txt` and `val_filenames.txt` to preserve object-level splits.
+- Keep validation data unaugmented; training loaders add noise based on measurement errors and apply random host-image rotations where applicable.
+- Report results across the configured folds rather than relying on a single random split.
+- Treat simulated pretraining, real-only training, frozen-backbone fine-tuning, and unimodal baselines as separate experimental conditions.
+
+## License
+
+This project is released under the MIT License. See [LICENSE](LICENSE).
+
+## Repository
+
+Source code: https://github.com/hassaan4717/AstronomicalSupernova_Transient-SciML
